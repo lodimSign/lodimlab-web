@@ -67,22 +67,31 @@ font-size:17px;font-weight:800;padding:17px;border-radius:18px;margin-top:18px}
           note: 'No account, no server. This link holds everything, and records stay on each phone.' }
   };
   var EMOJI = { keyring: '🔑', figure: '🧸', plush: '🐻', other: '📦' };
+  var CATS = ['keyring', 'figure', 'plush', 'other']; // lib/model.js 의 CATEGORIES 와 같은 순서
   // 그림 키는 앱이 같이 들고 다니는 기본 아이템 6종뿐이다. 주소에서 온 값으로 src 를 만들면
   // 아무 경로나 불러오게 되므로 이 목록에 있는 것만 그린다.
   var ART = ['bunny', 'bear', 'duck', 'ghost', 'pig', 'whale'];
   var CARRY_ON_M3 = 0.055; // lib/model.js 와 같은 값
 
+  // 주소 '#' 뒤는 base64url 로 줄인 배열이다 (만드는 쪽은 lib/model.js 의 shareLink).
+  // [버전, 말(0=ko), 참은금액, 개수, cm³, [[이름, 가격, 카테고리번호, 그림?], …]]
   function read() {
     var raw = location.hash.slice(1);
     if (!raw) return null;
     try {
-      var d = JSON.parse(decodeURIComponent(raw));
-      if (!d || d.v !== 1) return null;
-      d.i = Array.isArray(d.i) ? d.i : [];
-      d.s = Number(d.s) || 0;
-      d.c = Number(d.c) || 0;
-      d.m = Number(d.m) || 0;
-      return d;
+      raw = decodeURIComponent(raw).replace(/-/g, '+').replace(/_/g, '/');
+      var bin = atob(raw + '==='.slice((raw.length + 3) % 4)); // 보낼 때 뗀 패딩을 다시 붙인다
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var d = JSON.parse(new TextDecoder().decode(bytes));
+      if (!Array.isArray(d) || d[0] !== 2) return null;
+      return {
+        l: d[1] === 1 ? 'en' : 'ko',
+        s: Number(d[2]) || 0,
+        c: Number(d[3]) || 0,
+        m: (Number(d[4]) || 0) / 1e6,
+        i: Array.isArray(d[5]) ? d[5] : []
+      };
     } catch (e) { return null; }
   }
 
@@ -131,17 +140,18 @@ font-size:17px;font-weight:800;padding:17px;border-radius:18px;margin-top:18px}
     shelf.appendChild(el('p', 'shelfTitle', t.shelf));
     var grid = el('div', 'grid');
     data.i.forEach(function (x) {
+      if (!Array.isArray(x)) return;
       var toy = el('div', 'toy');
-      if (ART.indexOf(x.a) >= 0) {
+      if (ART.indexOf(x[3]) >= 0) {
         var img = new Image();
-        img.src = 'items/' + x.a + '.png';
+        img.src = 'items/' + x[3] + '.png';
         img.alt = '';
         toy.appendChild(img);
       } else {
-        toy.appendChild(el('div', 'emoji', EMOJI[x.k] || EMOJI.other));
+        toy.appendChild(el('div', 'emoji', EMOJI[CATS[x[2]]] || EMOJI.other));
       }
-      toy.appendChild(el('div', 'n', String(x.n == null ? '' : x.n).slice(0, 20)));
-      toy.appendChild(el('div', 'p', money(Number(x.p) || 0)));
+      toy.appendChild(el('div', 'n', String(x[0] == null ? '' : x[0]).slice(0, 20)));
+      toy.appendChild(el('div', 'p', money(Number(x[1]) || 0)));
       grid.appendChild(toy);
     });
     shelf.appendChild(grid);
