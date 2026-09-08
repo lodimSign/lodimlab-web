@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Moappop — 내 컬렉션</title>
+<meta name="description" content="사고 싶은 건 뽑기로, 돈은 그대로. Moappop 컬렉션.">
+<meta property="og:title" content="내가 참은 금액, 한번 볼래요?">
+<meta property="og:description" content="사고 싶은 건 뽑기로, 돈은 그대로 — Moappop">
+<meta property="og:image" content="https://lodimsign.github.io/lodimlab-web/moappop/og.png">
+<meta property="og:type" content="website">
+<style>
+:root{--night:#143695;--cream:#f2ede8;--lilac:#e6daef;--pink:#fa648b;
+--ink:#2b2340;--sub:#8a8399;--woodLight:#7a5a3a;--line:#e3d9d2}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--night);color:var(--ink);
+font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+-webkit-text-size-adjust:100%}
+main{max-width:440px;margin:0 auto;padding:24px 18px 40px}
+.brand{color:var(--cream);text-align:center;font-size:19px;font-weight:800;letter-spacing:.4px;margin-bottom:18px}
+.card{background:var(--cream);border-radius:22px;padding:22px 18px;margin-bottom:14px}
+.hero{text-align:center}
+.hero .label{color:var(--sub);font-size:14px;margin:0 0 6px}
+.hero .big{color:var(--pink);font-size:38px;font-weight:900;margin:0;letter-spacing:-1px;line-height:1.1}
+.hero .lead{margin:8px 0 0;font-size:16px;font-weight:700}
+.stats{display:flex;gap:8px}
+.stat{flex:1;background:var(--lilac);border-radius:16px;padding:14px 8px;text-align:center}
+.stat .icon{font-size:20px}
+.stat .k{display:block;color:var(--sub);font-size:11px;margin:5px 0 3px;white-space:nowrap}
+.stat .v{display:block;font-size:15px;font-weight:800}
+.shelfTitle{font-size:15px;font-weight:800;margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.toy{background:#fff;border:1px solid var(--line);border-bottom:5px solid var(--woodLight);
+border-radius:14px;padding:10px 6px 8px;text-align:center}
+.toy img{width:56px;height:56px;object-fit:contain;display:block;margin:0 auto}
+.toy .emoji{font-size:38px;line-height:56px;height:56px}
+.toy .n{font-size:12px;font-weight:700;margin:6px 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toy .p{font-size:11px;color:var(--sub)}
+.more{margin:12px 0 0;text-align:center;color:var(--sub);font-size:13px}
+.intro{text-align:center;font-size:15px;line-height:1.7;margin:0}
+.cta{display:block;background:var(--pink);color:#fff;text-align:center;text-decoration:none;
+font-size:17px;font-weight:800;padding:17px;border-radius:18px;margin-top:18px}
+.note{color:#aab3d8;font-size:12px;line-height:1.7;text-align:center;margin:14px 4px 0}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">🧸 Moappop</div>
+  <section class="card hero" id="hero"></section>
+  <section class="card stats" id="stats" hidden></section>
+  <section class="card" id="shelf" hidden></section>
+  <a class="cta" id="cta" href="https://apps.apple.com/app/id6808238800"></a>
+  <p class="note" id="note"></p>
+</main>
+<script>
+(function () {
+  'use strict';
+  var T = {
+    ko: { label: '지금까지', lead: '참았어요', items: '소장품', space: '캐리어 몇 개분', real: '실제 공간',
+          shelf: '이 사람의 컬렉션', more: '그리고 {n}개 더', cta: '내 컬렉션 만들기', count: '{n}개',
+          intro: '사고 싶은 건 뽑기로, 돈은 그대로.<br>가지고 싶은 걸 자판기에 넣고 뽑으면서 참는 앱이에요.',
+          note: '계정도 서버도 없어요. 이 링크에 담긴 것이 전부고, 기록은 각자 폰에만 남아요.' },
+    en: { label: 'So far', lead: 'saved', items: 'Items', space: 'Carry-ons', real: 'Real space',
+          shelf: 'Their collection', more: 'and {n} more', cta: 'Make my own collection', count: '{n}',
+          intro: 'Wishlist gacha. Keep your cash.<br>Put what you want into a capsule machine and pull instead of buying.',
+          note: 'No account, no server. This link holds everything, and records stay on each phone.' }
+  };
+  var EMOJI = { keyring: '🔑', figure: '🧸', plush: '🐻', other: '📦' };
+  // 그림 키는 앱이 같이 들고 다니는 기본 아이템 6종뿐이다. 주소에서 온 값으로 src 를 만들면
+  // 아무 경로나 불러오게 되므로 이 목록에 있는 것만 그린다.
+  var ART = ['bunny', 'bear', 'duck', 'ghost', 'pig', 'whale'];
+  var CARRY_ON_M3 = 0.055; // lib/model.js 와 같은 값
+
+  function read() {
+    var raw = location.hash.slice(1);
+    if (!raw) return null;
+    try {
+      var d = JSON.parse(decodeURIComponent(raw));
+      if (!d || d.v !== 1) return null;
+      d.i = Array.isArray(d.i) ? d.i : [];
+      d.s = Number(d.s) || 0;
+      d.c = Number(d.c) || 0;
+      d.m = Number(d.m) || 0;
+      return d;
+    } catch (e) { return null; }
+  }
+
+  var data = read();
+  var t = T[data && data.l === 'en' ? 'en' : 'ko'];
+  var money = function (n) { return '₩' + Math.round(n).toLocaleString('ko-KR'); };
+  var fill = function (s, n) { return s.replace('{n}', n); };
+  var el = function (tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text; // 주소에서 온 이름·가격은 반드시 텍스트로만 넣는다
+    return e;
+  };
+
+  document.getElementById('cta').textContent = t.cta;
+  document.getElementById('note').textContent = t.note;
+  document.documentElement.lang = data && data.l === 'en' ? 'en' : 'ko';
+  var hero = document.getElementById('hero');
+
+  if (!data) { // 주소에 컬렉션이 없으면 앱 소개만 보여준다
+    var p = el('p', 'intro');
+    p.innerHTML = t.intro; // 사전에 있는 우리 문구뿐 — 바깥에서 온 값이 아니다
+    hero.appendChild(p);
+    return;
+  }
+
+  hero.appendChild(el('p', 'label', t.label));
+  hero.appendChild(el('p', 'big', money(data.s)));
+  hero.appendChild(el('p', 'lead', t.lead));
+
+  var stats = document.getElementById('stats');
+  [['🧸', t.items, fill(t.count, data.c)],
+   ['🧳', t.space, fill(t.count, (data.m / CARRY_ON_M3).toFixed(1))],
+   ['🏠', t.real, '0cm²']
+  ].forEach(function (row) {
+    var box = el('div', 'stat');
+    box.appendChild(el('div', 'icon', row[0]));
+    box.appendChild(el('span', 'k', row[1]));
+    box.appendChild(el('span', 'v', row[2]));
+    stats.appendChild(box);
+  });
+  stats.hidden = false;
+
+  if (data.i.length) {
+    var shelf = document.getElementById('shelf');
+    shelf.appendChild(el('p', 'shelfTitle', t.shelf));
+    var grid = el('div', 'grid');
+    data.i.forEach(function (x) {
+      var toy = el('div', 'toy');
+      if (ART.indexOf(x.a) >= 0) {
+        var img = new Image();
+        img.src = 'items/' + x.a + '.png';
+        img.alt = '';
+        toy.appendChild(img);
+      } else {
+        toy.appendChild(el('div', 'emoji', EMOJI[x.k] || EMOJI.other));
+      }
+      toy.appendChild(el('div', 'n', String(x.n == null ? '' : x.n).slice(0, 20)));
+      toy.appendChild(el('div', 'p', money(Number(x.p) || 0)));
+      grid.appendChild(toy);
+    });
+    shelf.appendChild(grid);
+    if (data.c > data.i.length) shelf.appendChild(el('p', 'more', fill(t.more, data.c - data.i.length)));
+    shelf.hidden = false;
+  }
+})();
+</script>
+</body>
+</html>
